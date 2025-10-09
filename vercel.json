@@ -15,12 +15,5 @@
       "dest": "/public/$1"
     }
   ],
-  "regions": ["iad1"],
-  "functions": {
-    "api/**/*.py": {
-      "runtime": "python3.9",
-      "maxDuration": 30,
-      "memory": 1024
-    }
-  }
+  "regions": ["iad1"]
 }
