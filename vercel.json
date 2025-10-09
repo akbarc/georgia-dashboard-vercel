@@ -15,14 +15,6 @@
       "dest": "/public/$1"
     }
   ],
-  "env": {
-    "DB_SERVER": "@db-server",
-    "DB_PORT": "@db-port",
-    "DB_USERNAME": "@db-username",
-    "DB_PASSWORD": "@db-password",
-    "DB_DATABASE": "@db-database",
-    "TDS_VERSION": "7.0"
-  },
   "regions": ["iad1"],
   "functions": {
     "api/**/*.py": {
