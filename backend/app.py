@@ -172,66 +172,68 @@ def executive_summary():
 def gold_price():
     """Get current gold price from free API"""
     try:
-        # Using Metals.dev free API (no API key required for basic usage)
-        response = requests.get(
-            'https://api.metals.dev/v1/latest',
-            params={
-                'api_key': os.environ.get('METALS_API_KEY', 'demo'),
-                'currency': 'USD',
-                'unit': 'toz'
-            },
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            gold_price_oz = data.get('metals', {}).get('gold', 0)
-            
-            return jsonify({
-                'success': True,
-                'data': {
-                    'gold_price_usd': gold_price_oz,
-                    'unit': 'troy ounce',
+        # Primary: Metals.dev API
+        metals_api_key = os.environ.get('METALS_API_KEY')
+        if metals_api_key:
+            response = requests.get(
+                'https://api.metals.dev/v1/latest',
+                params={
+                    'api_key': metals_api_key,
                     'currency': 'USD',
-                    'timestamp': datetime.now().isoformat(),
-                    'source': 'metals.dev'
-                }
-            })
-        else:
-            # Fallback: Use a backup free API (goldapi.io demo)
+                    'unit': 'toz'
+                },
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                gold_price_oz = data.get('metals', {}).get('gold')
+                
+                if gold_price_oz is not None:
+                    return jsonify({
+                        'success': True,
+                        'data': {
+                            'gold_price_usd': gold_price_oz,
+                            'unit': 'troy ounce',
+                            'currency': 'USD',
+                            'timestamp': datetime.now().isoformat(),
+                            'source': 'metals.dev'
+                        }
+                    })
+        
+        # Fallback: GoldAPI.io
+        gold_api_key = os.environ.get('GOLD_API_KEY')
+        if gold_api_key:
             backup_response = requests.get(
                 'https://www.goldapi.io/api/XAU/USD',
                 headers={
-                    'x-access-token': os.environ.get('GOLD_API_KEY', 'goldapi-demo')
+                    'x-access-token': gold_api_key
                 },
                 timeout=10
             )
             
             if backup_response.status_code == 200:
                 backup_data = backup_response.json()
-                return jsonify({
-                    'success': True,
-                    'data': {
-                        'gold_price_usd': backup_data.get('price', 0),
-                        'unit': 'troy ounce',
-                        'currency': 'USD',
-                        'timestamp': datetime.now().isoformat(),
-                        'source': 'goldapi.io'
-                    }
-                })
-            
-            # Final fallback: return approximate market price
-            return jsonify({
-                'success': True,
-                'data': {
-                    'gold_price_usd': 2350.00,
-                    'unit': 'troy ounce',
-                    'currency': 'USD',
-                    'timestamp': datetime.now().isoformat(),
-                    'source': 'fallback',
-                    'note': 'Using approximate market price - live API unavailable'
-                }
-            })
+                price = backup_data.get('price')
+                
+                if price is not None:
+                    return jsonify({
+                        'success': True,
+                        'data': {
+                            'gold_price_usd': price,
+                            'unit': 'troy ounce',
+                            'currency': 'USD',
+                            'timestamp': datetime.now().isoformat(),
+                            'source': 'goldapi.io'
+                        }
+                    })
+        
+        # No API keys configured or all APIs failed
+        return jsonify({
+            'success': False,
+            'error': 'No gold price API configured. Please set METALS_API_KEY or GOLD_API_KEY environment variable.',
+            'timestamp': datetime.now().isoformat()
+        }), 503
             
     except Exception as e:
         return jsonify({
