@@ -5,6 +5,7 @@ Connects to SQL Server via Tailscale
 import os
 import pymssql
 import pandas as pd
+import requests
 from datetime import datetime
 from decimal import Decimal
 from flask import Flask, jsonify, request
@@ -62,10 +63,11 @@ def home():
         'name': 'Georgia Dashboard Backend',
         'status': 'running',
         'version': '1.0',
-        'endpoints': {
+'endpoints': {
             '/health': 'Database health check',
             '/api/test': 'Simple test endpoint',
-            '/api/executive-summary': 'Executive dashboard metrics'
+            '/api/executive-summary': 'Executive dashboard metrics',
+            '/api/gold-price': 'Current gold price in USD per troy ounce'
         }
     })
 
@@ -165,6 +167,79 @@ def executive_summary():
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         }), 500
+
+@app.route('/api/gold-price')
+def gold_price():
+    """Get current gold price from free API"""
+    try:
+        # Using Metals.dev free API (no API key required for basic usage)
+        response = requests.get(
+            'https://api.metals.dev/v1/latest',
+            params={
+                'api_key': os.environ.get('METALS_API_KEY', 'demo'),
+                'currency': 'USD',
+                'unit': 'toz'
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            gold_price_oz = data.get('metals', {}).get('gold', 0)
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'gold_price_usd': gold_price_oz,
+                    'unit': 'troy ounce',
+                    'currency': 'USD',
+                    'timestamp': datetime.now().isoformat(),
+                    'source': 'metals.dev'
+                }
+            })
+        else:
+            # Fallback: Use a backup free API (goldapi.io demo)
+            backup_response = requests.get(
+                'https://www.goldapi.io/api/XAU/USD',
+                headers={
+                    'x-access-token': os.environ.get('GOLD_API_KEY', 'goldapi-demo')
+                },
+                timeout=10
+            )
+            
+            if backup_response.status_code == 200:
+                backup_data = backup_response.json()
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'gold_price_usd': backup_data.get('price', 0),
+                        'unit': 'troy ounce',
+                        'currency': 'USD',
+                        'timestamp': datetime.now().isoformat(),
+                        'source': 'goldapi.io'
+                    }
+                })
+            
+            # Final fallback: return approximate market price
+            return jsonify({
+                'success': True,
+                'data': {
+                    'gold_price_usd': 2350.00,
+                    'unit': 'troy ounce',
+                    'currency': 'USD',
+                    'timestamp': datetime.now().isoformat(),
+                    'source': 'fallback',
+                    'note': 'Using approximate market price - live API unavailable'
+                }
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
